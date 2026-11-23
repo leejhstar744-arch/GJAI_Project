@@ -1,0 +1,18 @@
+# 학습 데이터셋 zip 은 GitHub 파일 크기 제한(100MB)을 넘어서 올리지 않음 (구글 드라이브에 따로 보관)
+dataset*.zip
+# 실행·학습 결과
+output/
+runs/
+hybrid_data/
+configs/rose_data.yaml
+__pycache__/
+# 모델: weights/ 와 FastSAM-s.pt 만 올림 (그 밖의 .pt 는 학습 결과물)
+*.pt
+!weights/*.pt
+!FastSAM-s.pt
+# Claude API 키 — 절대 올리지 않음
+ANTHROPIC_API_KEY.txt
+*API_KEY*.txt
+.env
+# 등급 참고 크롭 (데이터셋에서 tools/make_vlm_examples.py 로 다시 만듦, 현재 기본 설정에서는 안 씀)
+cls_reference/
