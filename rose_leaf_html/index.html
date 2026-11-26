@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>장미 잎 이상 탐지</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌹</text></svg>">
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d2320; --muted: #66706b; --line: #e3e1da;
+    --accent: #2f6b4f; --accent-ink: #ffffff; --accent-soft: #e6f0ea; --warn: #b4531a; --err: #b3261e;
+    --fresh: #3cb43c; --black_spot: #e02828; --insects_infected: #2a8cff; --downy_mildew: #d9b800;
+    --unknown: #d000d0; --hold: #969696; --hold_shape: #5a5a5a;
+    --radius: 10px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; }
+  header { padding: 28px 24px 8px; max-width: 1180px; margin: 0 auto; }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+  header p { margin: 6px 0 0; color: var(--muted); }
+  .steps { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .steps span { font-size: 13px; padding: 4px 10px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .steps b { color: var(--accent); margin-right: 4px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 12px 24px 60px; display: grid; gap: 18px; }
+  section.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+  section.card h2 { margin: 0 0 14px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  section.card h2 .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 14px; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .drop { border: 2px dashed #c9c6bc; border-radius: var(--radius); padding: 26px; text-align: center; cursor: pointer; transition: .15s; background: #fbfaf7; }
+  .drop.over, .drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .drop strong { display: block; font-size: 16px; }
+  .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .thumbs figure { margin: 0; width: 92px; font-size: 11px; color: var(--muted); position: relative; }
+  .thumbs img { width: 92px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); display: block; }
+  .thumbs figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumbs button { position: absolute; top: 2px; right: 2px; border: 0; border-radius: 50%; width: 20px; height: 20px; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; line-height: 1; padding: 0; }
+
+  .models { display: grid; gap: 8px; }
+  .models label { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+  .models label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .models .acc { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .models code { font-size: 12px; color: var(--muted); display: block; }
+
+  button.btn, a.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); padding: 10px 18px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.btn.ghost, a.btn.ghost { background: transparent; color: var(--accent); }
+  button.btn:disabled { opacity: .45; cursor: not-allowed; }
+  a.btn { text-decoration: none; display: inline-block; }
+  select, input[type=number], input[type=password], input[type=text] { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); }
+  input[type=number] { width: 80px; }
+
+  .status { display: none; padding: 12px 14px; border-radius: 8px; background: #f0efe9; font-size: 14px; }
+  .status.show { display: block; }
+  .status.err { background: #fbe9e7; color: var(--err); }
+  .bar { height: 6px; border-radius: 3px; background: #e2e0d8; margin-top: 8px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .bar.indet > i { width: 30%; animation: slide 1.2s infinite ease-in-out; }
+  @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 13px; background: #f1f0eb; border: 1px solid var(--line); white-space: nowrap; }
+  .chip i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .chip b { font-family: var(--mono); }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
+  .tabs button { border: 0; background: none; padding: 9px 14px; font: inherit; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tabs button.on { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+
+  .vis { width: 100%; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; display: block; }
+  .meta { font-size: 13px; color: var(--muted); margin: 8px 0 12px; }
+  .leafgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .leaf { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; font-size: 12px; cursor: pointer; }
+  .leaf img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #222; }
+  .leaf .b { padding: 6px 8px; }
+  .leaf .t { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
+  .probs { margin-top: 4px; display: grid; gap: 2px; }
+  .probs span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .probs div { display: grid; grid-template-columns: 98px 1fr 34px; gap: 4px; align-items: center; }
+  .probs s { height: 5px; background: #eee; border-radius: 2px; overflow: hidden; text-decoration: none; display: block; }
+  .probs s u { display: block; height: 100%; text-decoration: none; }
+  .probs em { font-style: normal; font-family: var(--mono); text-align: right; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; position: sticky; top: 0; background: #fff; }
+  td img { width: 64px; height: 64px; object-fit: cover; border-radius: 5px; display: block; cursor: pointer; }
+  .tablewrap { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .v { font-weight: 700; font-size: 12px; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
+  .v.AGREE, .v.VLM_HEALTHY { background: #e3f4e3; color: #236b23; }
+  .v.FALSE_ALARM { background: #fdeedd; color: #a24d06; }
+  .v.MISSED, .v.VLM_ANOMALY { background: #fde3e1; color: #a51c13; }
+  .v.OTHER_CLASS { background: #fbf4cc; color: #7c6700; }
+  .v.NOT_A_LEAF, .v.UNCLEAR { background: #ececec; color: #555; }
+
+  details.more { margin-top: 14px; }
+  details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; align-items: center; }
+  .form label { color: var(--muted); font-size: 14px; }
+  .keybox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .keybox input { min-width: 280px; flex: 1; font-family: var(--mono); }
+  .note { font-size: 13px; background: #f6f5f0; border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 0 6px 6px 0; }
+  .plan { margin-top: 12px; }
+  .legend { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 13px; }
+  .hidden { display: none !important; }
+
+  .lightbox { position: fixed; inset: 0; background: rgba(10,12,11,.88); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; cursor: zoom-out; flex-direction: column; gap: 10px; }
+  .lightbox.show { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 88vh; border-radius: 6px; }
+  .lightbox p { color: #ddd; margin: 0; font-size: 14px; text-align: center; max-width: 900px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 0 30px; }
+
+  :root[data-theme=dark] { --bg:#141716; --panel:#1d2120; --ink:#e8ebe9; --muted:#9aa39f; --line:#323836; --accent:#5fae86; --accent-ink:#0d1411; --accent-soft:#1f3329; }
+  :root[data-theme=dark] .drop { background:#191c1b; border-color:#3a403e; }
+  :root[data-theme=dark] select, :root[data-theme=dark] input[type=number], :root[data-theme=dark] input[type=password], :root[data-theme=dark] input[type=text] { background:#141716; }
+  :root[data-theme=dark] .status, :root[data-theme=dark] .note, :root[data-theme=dark] .chip { background:#232826; }
+  :root[data-theme=dark] th, :root[data-theme=dark] .leaf { background:var(--panel); }
+  .engine { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:14px; }
+  .load { font-size:13px; color:var(--muted); margin-top:8px; min-height:1.4em; }
+  .warn { color: var(--warn); }
+  canvas.vis { width:100%; height:auto; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg label { padding:6px 12px; cursor:pointer; font-size:14px; }
+  .seg label:has(input:checked) { background:var(--accent); color:var(--accent-ink); }
+  .seg input { display:none; }
+  .small { font-size:12px; }
+
+</style>
+</head>
+<body>
+<header>
+  <h1>🌹 장미 잎 이상 탐지</h1>
+  <p>챔버 사진에서 잎을 하나씩 찾고, 잎마다 상태를 판정한 뒤, 필요하면 Claude에게 한 번 더 확인받습니다. 모든 분석은 이 브라우저 안에서 실행되고 사진은 어디로도 올라가지 않습니다.</p>
+  <div class="steps"><span><b>1</b>잎 탐색 (leaf_seg_v8r2)</span><span><b>2</b>상태 분류 (YOLO-cls)</span><span><b>3</b>VLM 검증 (선택)</span></div>
+</header>
+
+<main>
+  <section class="card" id="upload">
+    <h2><span class="n">1</span>사진 올리기와 분류 모델 선택</h2>
+    <div class="grid2">
+      <div>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="사진 고르기">
+          <strong>사진을 끌어다 놓거나 눌러서 고르세요</strong>
+          <span class="hint">jpg, png, bmp, webp · 여러 장 가능</span>
+          <input type="file" id="file" accept=".jpg,.jpeg,.png,.bmp,.webp,.jfif,image/*" multiple hidden>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:8px">2단계 분류 모델 (잎 탐색 모델은 같습니다)</div>
+        <div class="models" id="models"></div>
+        <div class="engine">
+          <span class="hint">계산 장치</span>
+          <span class="seg" id="engineSeg">
+            <label><input type="radio" name="engine" value="auto" checked>자동</label>
+            <label><input type="radio" name="engine" value="webgpu">GPU (WebGPU)</label>
+            <label><input type="radio" name="engine" value="wasm">CPU (WASM)</label>
+          </span>
+        </div>
+        <div class="load" id="loadInfo"></div>
+        <div id="pickModels" class="hidden" style="margin-top:8px">
+          <div class="note">모델 파일을 불러오지 못했습니다. 이 HTML과 함께 받은 <b>models</b> 폴더를 골라 주세요.</div>
+          <button class="btn ghost" id="pickBtn" style="margin-top:8px">models 폴더 고르기</button>
+          <input type="file" id="pickInput" webkitdirectory multiple hidden>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn" id="run" disabled>분석 시작</button>
+      <button class="btn ghost" id="sample">샘플 사진으로 실행</button>
+      <button class="btn ghost hidden" id="stop">멈추기</button>
+      <span class="hint" id="devinfo"></span>
+    </div>
+    <div class="status" id="status" style="margin-top:14px"><span id="statusText"></span><div class="bar" id="bar"><i></i></div></div>
+  </section>
+
+  <section class="card hidden" id="results">
+    <h2><span class="n">2</span>판정 결과
+      <span style="margin-left:auto" class="row">
+        <button class="btn ghost" id="csv" style="padding:7px 14px;font-size:14px">summary.csv</button>
+        <button class="btn" id="zip" style="padding:7px 14px;font-size:14px">결과 zip 내려받기</button>
+      </span>
+    </h2>
+    <div class="tabs" id="tabs"></div>
+    <div id="photoView"></div>
+    <details class="more">
+      <summary>판정 상태 설명</summary>
+      <div class="legend" style="margin-top:10px">
+        <span class="chip"><i style="background:var(--fresh)"></i>FRESH</span><span>healthy 확률 ≥ 0.7, 정상</span>
+        <span class="chip"><i style="background:var(--black_spot)"></i>ANOMALY</span><span>이상 클래스 확률 최댓값 ≥ 0.5 (black_spot · downy_mildew · insects_infected)</span>
+        <span class="chip"><i style="background:var(--unknown)"></i>UNKNOWN</span><span>이상 의심, 관찰 대상</span>
+        <span class="chip"><i style="background:var(--hold_shape)"></i>HOLD_SHAPE</span><span>볼록도 &lt; 0.8 또는 사진 가장자리에 닿음 (잎이 합쳐졌거나 잘림), 판정 안 함</span>
+        <span class="chip"><i style="background:var(--hold)"></i>HOLD</span><span>품질 기준 미달, 판정 안 함</span>
+      </div>
+      <p class="hint">샘플 사진은 건강한 잎만 있는 사진이라 이상·의심 판정은 오경보일 가능성이 큽니다. 챔버의 거울 벽에 비친 잎도 잎으로 세어집니다.</p>
+    </details>
+  </section>
+
+  <section class="card hidden" id="vlmCard">
+    <h2><span class="n">3</span>VLM으로 검증 (선택)</h2>
+    <p class="hint" style="margin-top:-6px">이상·의심 잎 전부와 건강 잎 일부를 확대 사진 + 주변 사진 두 장으로 Claude에게 보여 줍니다. 분류 모델의 답은 알려 주지 않습니다.</p>
+    <div class="form">
+      <label>방식</label>
+      <div class="row">
+        <select id="backend"></select>
+        <select id="claudeModel"><option>claude-opus-5-5</option><option>claude-sonnet-5-5</option><option>claude-haiku-5-5</option></select>
+        <select id="effort" title="effort"><option>low</option><option>medium</option><option>high</option></select>
+      </div>
+      <label class="keyrow">API 키</label>
+      <div class="keyrow">
+        <div class="keybox">
+          <input type="password" id="apikey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <a href="#" id="keyFileBtn" class="hint">키 파일에서 읽기</a>
+          <input type="file" id="keyFileInput" hidden>
+        </div>
+        <div class="hint" id="keyinfo" style="margin-top:4px">키는 이 페이지의 메모리에만 있고, 저장하거나 Anthropic 말고 다른 곳으로 보내지 않습니다. 새로 고치면 사라집니다.</div>
+      </div>
+      <label>검증 범위</label>
+      <div class="row">
+        <span>건강 잎 표본 <input type="number" id="fresh" value="5" min="0" max="50">장</span>
+        <span>사진당 최대 <input type="number" id="max" value="40" min="1" max="200">장</span>
+      </div>
+    </div>
+    <div class="note" id="vlmNote" style="margin-top:14px"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn ghost" id="dry">검증할 잎 수 확인</button>
+      <button class="btn" id="verify" disabled>검증 실행</button>
+      <button class="btn ghost hidden" id="vstop">멈추기</button>
+    </div>
+    <div class="plan" id="plan"></div>
+    <div class="status" id="vstatus" style="margin-top:14px"><span id="vstatusText"></span><div class="bar" id="vbar"><i></i></div></div>
+    <div id="vlmView"></div>
+  </section>
+</main>
+<footer>leafdx 브라우저 버전 · 결과는 Python(ultralytics 8.4.198) 버전과 잎 단위로 같도록 맞췄습니다 (CPU 계산 기준)</footer>
+
+<div class="lightbox" id="lb"><img id="lbImg" alt=""><p id="lbCap"></p></div>
+
+<script src="leafdx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

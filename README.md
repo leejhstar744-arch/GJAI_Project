@@ -3,6 +3,16 @@
 
 ---
 
+# Minirose_Disease_show — 장미 잎 이상 탐지 (HTML 버전)
+
+챔버 사진에서 잎을 찾고(leaf_seg_v8r2) 잎마다 상태를 판정(YOLO-cls)한 뒤, 필요하면 Claude로 한 번 더 확인하는 웹 페이지입니다.
+설치 없이 브라우저에서 바로 실행되고, 사진은 브라우저 밖으로 나가지 않습니다.
+
+- 바로 쓰기: **https://leejhstar744-arch.github.io/GJAI_Project/rose_leaf_html/** (GitHub Pages를 이 브랜치로 켠 뒤)
+- 코드와 설명: [`rose_leaf_html/`](rose_leaf_html) · [README](rose_leaf_html/README.md)
+
+---
+
 # helpai — Rose_Growth
 
 미니 장미 트레이 사진(카메라 2대)에서 화분별 **생장 단계**(`grade_zero` ~ `grade_four`)를 판단하는 파이프라인입니다.
